@@ -28,6 +28,7 @@
 #include "./loss/softmax_layer-inl.hpp"
 #include "./loss/lp_loss_layer-inl.hpp"
 #include "./loss/multi_logistic_layer-inl.hpp"
+#include "./lstm_layer-inl.hpp"
 #if CXXNET_USE_CAFFE_ADAPTOR
 #include "../plugin/caffe_adapter-inl.hpp"
 #endif
@@ -68,6 +69,12 @@ ILayer<xpu>* CreateLayer_(LayerType type,
     case kBatchNorm: return new BatchNormLayer<xpu>(p_rnd);
     case kLpLoss: return new LpLossLayer<xpu>(label_info);
     case kMultiLogistic: return new MultiLogisticLayer<xpu>(label_info);
+    case kLSTM: return new LSTMLayer<xpu,
+                                    op::tanh, op::tanh_grad,
+                                    op::sigmoid, op::sigmoid_grad,
+                                    op::sigmoid_grad, op::sigmoid_grad,
+                                    op::relu, op::relu_grad,
+                                    op::tanh, op::tanh_grad>(p_rnd);
     #if CXXNET_USE_CAFFE_ADAPTOR
     case kCaffe: return new CaffeLayer<xpu>();
     #endif

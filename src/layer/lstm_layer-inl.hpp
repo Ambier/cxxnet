@@ -20,7 +20,7 @@ class LSTMLayer : public ILayer<xpu> {
   public:
     LSTMLayer(mshadow::Random<xpu> *p_rnd) : prnd_(p_rnd) {}
     virtual ~LSTMLayer() {}
-    virtual void SetParam(char *name, char *val) {
+    virtual void SetParam(const char *name, const char *val) {
       param_.SetParam(name, val);
     }
     virtual void InitConnection(const std::vector<Node<xpu>*> &nodes_in,
@@ -36,7 +36,7 @@ class LSTMLayer : public ILayer<xpu> {
         param_.num_input_node = static_cast<int>(nodes_in[0]->data.size(3));
       }
       for (int i = 0; i < nodes_out.size(); ++i) {
-        if (nodes_out[i]) nodes_out[i]->shape_ = oshape;
+        if (nodes_out[i]) nodes_out[i]->data.shape_ = oshape;
       }
       p_cstate->states.resize(6);
       for (int i = 0; i < p_cstate->states.size(); ++i) {
@@ -94,7 +94,7 @@ class LSTMLayer : public ILayer<xpu> {
       gbo_ = 0.0f;
     }
     virtual void SaveModel(utils::IStream &fo) const {
-      fo.Write(&param_, sizeof(LSTMParam));
+      fo.Write(&param_, sizeof(LayerParam));
       Wi_.SaveBinary(fo);
       Wf_.SaveBinary(fo);
       Wo_.SaveBinary(fo);
@@ -109,7 +109,7 @@ class LSTMLayer : public ILayer<xpu> {
       bz_.SaveBinary(fo);
     }
     virtual void LoadModel(utils::IStream &fi) {
-      utils::Check(fi.Read(&param_, sizeof(LSTMParam)) != 0,
+      utils::Check(fi.Read(&param_, sizeof(LayerParam)) != 0,
                    "FullConnectLayer:LoadModel invalid model file");
       Wi_.LoadBinary(fi);
       Wf_.LoadBinary(fi);
@@ -184,7 +184,6 @@ class LSTMLayer : public ILayer<xpu> {
       mshadow::Tensor<xpu, 2> last_y = nodes_in[2]->mat();
       mshadow::Tensor<xpu, 2> y = nodes_out[0]->mat();
       mshadow::Tensor<xpu, 2> c_t = nodes_out[1]->mat();
-      mshadow::Tensor<xpu, 2> next_y = nodes_out[2]->mat();
 
       mshadow::Tensor<xpu, 2> z = p_cstate->states[0].FlatTo2D();
       mshadow::Tensor<xpu, 2> i = p_cstate->states[1].FlatTo2D();
@@ -219,15 +218,15 @@ class LSTMLayer : public ILayer<xpu> {
                         const std::vector<Node<xpu>*> &nodes_out,
                         ConnectState<xpu> *p_cstate) {
       using namespace mshadow::expr;
-      mshadow::Tensor<xpu, 2> delta_y = nodes_out[0]->data.mat();
-      mshadow::Tensor<xpu, 2> next_c = nodes_out[1]->data.mat();
-      mshadow::Tensor<xpu, 2> delta_z = nodes_out[3]->data.mat();
-      mshadow::Tensor<xpu, 2> delta_i = nodes_out[4]->data.mat();
-      mshadow::Tensor<xpu, 2> delta_o = nodes_out[5]->data.mat();
-      mshadow::Tensor<xpu, 2> delta_f = nodes_out[6]->data.mat();
-      mshadow::Tensor<xpu, 2> delta_c = nodes_out[7]->data.mat();
+      mshadow::Tensor<xpu, 2> delta_y = nodes_out[0]->mat();
+      // mshadow::Tensor<xpu, 2> next_c = nodes_out[1]->mat();
+      mshadow::Tensor<xpu, 2> delta_z = nodes_out[3]->mat();
+      mshadow::Tensor<xpu, 2> delta_i = nodes_out[4]->mat();
+      mshadow::Tensor<xpu, 2> delta_o = nodes_out[5]->mat();
+      mshadow::Tensor<xpu, 2> delta_f = nodes_out[6]->mat();
+      mshadow::Tensor<xpu, 2> delta_c = nodes_out[7]->mat();
 
-      mshadow::Tensor<xpu, 2> x = nodes_in[0]->data.mat();
+      mshadow::Tensor<xpu, 2> x = nodes_in[0]->mat();
 
       mshadow::Tensor<xpu, 2> z = p_cstate->states[0].FlatTo2D();
       mshadow::Tensor<xpu, 2> i = p_cstate->states[1].FlatTo2D();
@@ -272,7 +271,7 @@ class LSTMLayer : public ILayer<xpu> {
 
   protected:
     /*! \brief parameters for LSTM */
-    LSTMParam param_;
+    LayerParam param_;
     /*! \brief random number generator */
     mshadow::Random<xpu> *prnd_;
     /*! \brief weight */
