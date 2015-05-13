@@ -154,6 +154,46 @@ class CXXNetThreadTrainer : public INetTrainer {
     }
     this->WaitAllJobs();
   }
+  virtual void Forward(const DataBatch &data, int t, bool is_first) {
+    mshadow::Shape<4> oshape = out_temp.shape_;
+    oshape[0] = data.batch_size;
+    out_temp.Resize(oshape);
+    const size_t ndevice = devices_.size();
+    mshadow::index_t step = std::max(static_cast<mshadow::index_t>((batch_size + ndevice - 1) / ndevice), \
+                                     static_cast<mshadow::index_t>(1UL));
+    bool need_sync = sample_counter % update_period == 0;
+    bool need_update = false;
+    layer::LabelInfo info = GetLabelInfo(data);
+    this->InitEvalReq(eval_req);
+    for (mshadow::index_t i = nets_.size(); i != 0; --i) {
+      mshadow::index_t begin = std::min((i - 1) * step, data.batch_size);
+      mshadow::index_t end = std::min(i * step, data.batch_size);
+      std::vector<mshadow::Tensor<mshadow::cpu, 4> > extra_data;
+      for (mshadow::index_t j = 0; j < data.extra_data.size(); ++j){
+        extra_data.push_back(data.extra_data[j].Slice(begin, end));
+      }
+      std::vector<std::pair<int, mshadow::Tensor<cpu, 4> > > batch_eval_req;
+      for (index_t j = 0; j < eval_req.size(); ++j) {
+        batch_eval_req.push_back(
+          std::make_pair(eval_req[j].first, eval_req[j].second.Slice(begin, end)));
+      }
+      nets_[i - 1]->CopyLabel(t, info.Slice(begin, end));
+      nets_[i - 1]->Forward(data.data.Slice(begin, end),
+                            extra_data, need_sync, t, is_first);
+    }
+    this->WaitAllJobs();
+    if (++sample_counter >= update_period) {
+      sample_counter = 0;
+      epoch_counter += 1;
+    }
+
+  }
+  virtual void Backprop(int t, bool is_first) {
+    for (mshadow::index_t i = nets_.size(); i != 0; --i) {
+      nets_[i]->Backprop(false, t == 0, epoch_counter, t, is_first);
+    }
+    this->WaitAllJobs();
+  }
   virtual void Update(const DataBatch& data) {
     mshadow::Shape<4> oshape = out_temp.shape_;
     oshape[0] = data.batch_size;
@@ -247,7 +287,7 @@ class CXXNetThreadTrainer : public INetTrainer {
     // safe guard for safely use allreduce in eval
     if (pserver != NULL) {
       pserver->SetParam("msg:disable_allreduce", "1");
-    }    
+    }
     std::string ret;
     if (eval_train != 0) {
       ret += train_metric.Print("train");

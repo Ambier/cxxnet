@@ -41,6 +41,18 @@ class INetTrainer{
    */
   virtual void Update(const DataBatch &data) = 0;
   /*!
+   * \brief do forward for training (mainly for RNN)
+   * \param training data batch
+   */
+  virtual void Forward(const DataBatch &data, int t, bool is_first) = 0;
+  /*!
+   * \brief do backward for training (mainly for RNN)
+   * \param need_update
+   * \param update_epoch
+   * \param is_first trunk
+   */
+  virtual void Backprop(int t, bool is_first) = 0;
+  /*!
    * \brief evaluate a test statistics, output results as a string
    * \param iter_eval the iterator containing the evaluation data
    * \param data_name the name of the dataset, used to construct the returing string
@@ -69,7 +81,7 @@ class INetTrainer{
    *  This method will copy the weight from corresponding layers if their names match.
    * \param fi the stream that the model will be initialized from
    */
-  virtual void CopyModelFrom(utils::IStream &fi) = 0;   
+  virtual void CopyModelFrom(utils::IStream &fi) = 0;
   /*!
    * \brief set weight of certain layer
    * \param layer_name the name of the layer
@@ -82,7 +94,7 @@ class INetTrainer{
    * \brief set weight of certain layer
    * \param out_weight hold the output weight data, Flattened to 2D
    * \param out_shape hold the shape of the weight
-   * \param 
+   * \param
    * \param weight_tag type of weight can be "wmat" or "bias"
    */
   virtual void GetWeight(mshadow::TensorContainer<mshadow::cpu, 2> *out_weight,
