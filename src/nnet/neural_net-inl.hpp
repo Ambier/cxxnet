@@ -30,6 +30,8 @@ struct NeuralNet {
   layer::LabelInfo label_info;
   /*! \brief nodes in the neural net */
   std::vector<layer::Node<xpu> > nodes;
+  /*! \brief extra nodes in neural net */
+  std::vector<layer::Node<xpu> > extra_nodes;
   /*! \brief layers in the neural net */
   std::vector<layer::Connection<xpu> > connections;
   /*! \brief updaters in the neural net */
@@ -38,18 +40,28 @@ struct NeuralNet {
   mshadow::Random<xpu> rnd;
   /*! \brief stream for this  */
   mshadow::Stream<xpu> *stream;
+  /*! \brief net snapshots*/
+  std::vector<NeuralNet<xpu>*> snapshots;
+  /*! \brief trunk size for snapshots*/
+  int trunk_size;
   // constructor do nothing
   NeuralNet(const NetConfig &cfg,
             mshadow::index_t batch_size,
             int seed,
-            mshadow::Stream<xpu> *stream)
-      : cfg(cfg), rnd(seed), stream(stream) {
+            mshadow::Stream<xpu> *stream,
+            int trunk_size=0)
+      : cfg(cfg), rnd(seed), stream(stream), trunk_size(trunk_size) {
     // set maximum batch
     this->max_batch = batch_size;
     rnd.set_stream(stream);
     label_info.name2findex = &cfg.label_name_map;
+    snapshots.resize(trunk_size);
+    for (int i = 0; i < trunk_size; ++i) {
+      NeuralNet<xpu> *pnet = new NeuralNet(cfg, batch_size, seed, stream, 0);
+      snapshots[i] = pnet;
+    }
   }
-  ~NeuralNet(void) {
+  virtual ~NeuralNet(void) {
     this->FreeSpace();
   }
   /*! \brief save model to file */
@@ -63,16 +75,16 @@ struct NeuralNet {
       }
     }
   }
-  
+
   /*! \brief initial model parameters in the beginning */
   inline void InitModel(void) {
     this->InitNet();
     this->ConfigConntions();
     for (size_t i = 0; i < connections.size(); ++i) {
       if (this->cfg.layers[i].name != "") {
-	utils::TrackerPrintf("Initializing layer: %s\n", this->cfg.layers[i].name.c_str());
+        utils::TrackerPrintf("Initializing layer: %s\n", this->cfg.layers[i].name.c_str());
       } else {
-	utils::TrackerPrintf("Initializing layer: %d\n", static_cast<int>(i));
+        utils::TrackerPrintf("Initializing layer: %d\n", static_cast<int>(i));
       }
       layer::Connection<xpu> &c = connections[i];
       c.layer->InitConnection(c.nodes_in, c.nodes_out, &c.state);
@@ -106,26 +118,28 @@ struct NeuralNet {
    * \param is_train whether is training phase
    * \param batch the input batch
    */
-  inline void Forward(bool is_train,
+  virtual void Forward(bool is_train,
                       mshadow::Tensor<cpu,4> batch,
                       std::vector<mshadow::Tensor<cpu,4> > extra_data,
-                      bool need_sync) {
+                      bool need_sync, int t = -1, bool is_first_trunk=true) {
     // check if we need to adjust batch size according to the input
+    std::vector<layer::Node<xpu> > &nd = t == -1 ? nodes : snapshots[t]->nodes;
+    std::vector<layer::Connection<xpu> > &conn =  t == -1 ? connections : snapshots[t]->connections;
     this->AdjustBatchSize(batch.size(0));
     // copy data into node
-    mshadow::Copy(nodes[0].data, batch, stream);
+    mshadow::Copy(nd[0].data, batch, stream);
     for (size_t i = 0; i < extra_data.size(); ++i) {
-      mshadow::Copy(nodes[i + 1].data, extra_data[i], stream);
+      mshadow::Copy(nd[i + 1].data, extra_data[i], stream);
     }
     // setup updater notification
-    for (size_t i = connections.size(); i != 0; --i) {
+    for (size_t i = conn.size(); i != 0; --i) {
       for (size_t j = 0; j < updaters[i - 1].size(); ++j) {
         updaters[i - 1][j]->BeforeAllForward();
       }
     }
     // start forward prop
-    for (size_t i = 0; i < connections.size(); ++i) {
-      layer::Connection<xpu> &c = connections[i];
+    for (size_t i = 0; i < conn.size(); ++i) {
+      layer::Connection<xpu> &c = conn[i];
       for (size_t j = 0; j < updaters[i].size(); ++j) {
         updaters[i][j]->UpdateWait();
       }
@@ -138,9 +152,11 @@ struct NeuralNet {
    */
   inline void Backprop(bool prop_to_input,
                        bool need_update,
-                       long update_epoch) {
-    for (size_t i = connections.size(); i > 0; --i) {
-      layer::Connection<xpu> &c = connections[i - 1];
+                       long update_epoch,
+                       int t = -1, bool is_first_trunk = false) {
+    std::vector<layer::Connection<xpu> > &conn =  t == -1 ? connections : snapshots[t]->connections;
+    for (size_t i = conn.size(); i > 0; --i) {
+      layer::Connection<xpu> &c = conn[i - 1];
       for (size_t j = 0; j < updaters[i - 1].size(); ++j) {
         updaters[i - 1][j]->BeforeBackprop(c.nodes_in, c.nodes_out);
       }
@@ -226,13 +242,18 @@ struct NeuralNet {
       mshadow::Shape<4> s = nodes[i].data.shape_;
       nodes[i].AllocSpace();
       utils::TrackerPrintf("node[%s].shape: %u,%u,%u,%u\n",
-			   this->cfg.node_names[i].c_str(),
-			   s[0], s[1], s[2], s[3]);
+         this->cfg.node_names[i].c_str(),
+         s[0], s[1], s[2], s[3]);
+    }
+    for (size_t i = 0; i < extra_nodes.size(); ++i) {
+      extra_nodes[i].AllocSpace();
+    }
+    for (size_t i = 0; i < snapshots.size(); ++i) {
+      snapshots[i]->InitNodes();
     }
   }
- private:
   // intialize the neural net data structure
-  inline void InitNet(void) {
+  virtual void InitNet(bool create_layer=true) {
     nodes.resize(cfg.param.num_nodes);
     mshadow::Shape<3> s = cfg.param.input_shape;
     // setup input shape
@@ -262,7 +283,8 @@ struct NeuralNet {
         utils::Check(c.layer->AllowSharing(),
                      "some layer you set shared do not allow sharing");
       } else {
-        c.layer = layer::CreateLayer(c.type, &rnd, &label_info);
+        if (create_layer) c.layer = layer::CreateLayer(c.type, &rnd, &label_info);
+        else c.layer = NULL;
       }
       connections.push_back(c);
     }
@@ -280,6 +302,9 @@ struct NeuralNet {
                                        cfg.layercfg[i][j].second.c_str());
       }
     }
+    for (size_t i = 0; i < snapshots.size(); ++i) {
+      snapshots[i]->ConfigConntions();
+    }
   }
   // adjust batch size to a new value, the batch_size must be smaller than max_batch
   inline void AdjustBatchSize(mshadow::index_t batch_size) {
@@ -288,11 +313,32 @@ struct NeuralNet {
       for (size_t i = 0; i < nodes.size(); ++i) {
         nodes[i].data.shape_[0] = batch_size;
       }
+      for (size_t i = 0; i < extra_nodes.size(); ++i) {
+        extra_nodes[i].data.shape_[0] = batch_size;
+      }
       for (size_t i = 0; i < connections.size(); ++ i) {
         layer::Connection<xpu> &c = connections[i];
         c.layer->OnBatchSizeChanged(c.nodes_in, c.nodes_out, &c.state);
       }
+      for (size_t i = 0; i < snapshots.size(); ++i) {
+        snapshots[i]->AdjustBatchSize(batch_size);
+      }
     }
+  }
+  /*! \brief clone label info from iterator */
+  inline void CopyLabelInfo(int t, const layer::LabelInfo &info) {
+    snapshots[t]->DeepCopyLabelInfo(info);
+  }
+  inline void DeepCopyLabelInfo(const layer::LabelInfo &info) {
+    label_info.fields.resize(info.fields.size());
+    for (size_t i = 0; i < label_info.fields.size(); ++i) {
+      if (!(label_info.fields[i].label.shape_ == info.fields[i].label.shape_)) {
+        label_info.fields[i].label.shape_ = info.fields[i].label.shape_;
+        mshadow::AllocSpace(&label_info.fields[i].label, false);
+      }
+      mshadow::Copy(label_info.fields[i].label, info.fields[i].label, info.fields[i].label.stream_);
+    }
+    label_info.name2findex = info.name2findex;
   }
   /*! \brief free all space allocated in this struct*/
   inline void FreeSpace(void) {
@@ -300,6 +346,12 @@ struct NeuralNet {
     stream->Wait();
     for (size_t i = 0; i < nodes.size(); ++i) {
       nodes[i].FreeSpace();
+    }
+    for (size_t i = 0; i < extra_nodes.size(); ++i) {
+      extra_nodes[i].FreeSpace();
+    }
+    for (size_t i = 0; i < snapshots.size(); ++i) {
+      snapshots[i]->FreeSpace();
     }
     for (size_t i = 0; i < connections.size(); ++i) {
       if (connections[i].type != layer::kSharedLayer) {
@@ -311,7 +363,10 @@ struct NeuralNet {
         delete updaters[i][j];
       }
     }
-    nodes.clear(); connections.clear(); updaters.clear();
+    nodes.clear();
+    connections.clear();
+    updaters.clear();
+    snapshots.clear();
   }
 };
 
@@ -328,7 +383,8 @@ class NeuralNetThread {
                   int device_id,
                   mshadow::index_t batch_size,
                   int seed,
-                  bool new_thread = true)
+                  bool new_thread = true,
+                  int trunk_size = 0)
       : cfg(cfg), pserver(ps),
         device_id(device_id), batch_size(batch_size),
         seed(seed), new_thread(new_thread) {
@@ -343,7 +399,7 @@ class NeuralNetThread {
     } else {
       mshadow::InitTensorEngine<xpu>(device_id);
       stream = mshadow::NewStream<xpu>();
-      net_ = new NeuralNet<xpu>(cfg, batch_size, seed, stream);
+      net_ = new NeuralNet<xpu>(cfg, batch_size, seed, stream, trunk_size);
     }
   }
   // destructor
@@ -401,6 +457,33 @@ class NeuralNetThread {
   }
   inline void SyncParam(void) {
     this->task = kSyncParam;
+    this->ExecTask();
+  }
+  /*! \brief run a train forward */
+  inline void Forward(mshadow::Tensor<cpu,4> batch,
+                      const std::vector<mshadow::Tensor<mshadow::cpu, 4> >& extra_data,
+                      bool need_sync, int t = -1, bool is_first_trunk = true) {
+    iparam_batch = batch;
+    iparam_extra_data = extra_data;
+    iparam_need_sync = need_sync;
+    iparam_t = t;
+    iparam_first = is_first_trunk;
+    this->task = kTrainProp;
+    this->ExecTask();
+  }
+  inline void CopyLabel(int t, const layer::LabelInfo &label_info) {
+    iparam_t = t;
+    iparam_label_info = label_info;
+    this->task = kCopyLabel;
+    this->ExecTask();
+  }
+  inline void Backprop(bool prop_to_input, bool need_update, size_t update_epoch, int t, bool is_first) {
+    iparam_flag = prop_to_input;
+    iparam_need_update = need_update;
+    iparam_epoch = update_epoch;
+    iparam_t = t;
+    iparam_first = is_first;
+    this->task = kTrainBackprop;
     this->ExecTask();
   }
   /*! \brief run a training forward backprop pass */
@@ -469,6 +552,7 @@ class NeuralNetThread {
     this->task = kGetWeight;
     this->ExecTask();
   }
+
   // return reference of node
   inline const NeuralNet<xpu> &net(void) const{
     return *net_;
@@ -483,8 +567,11 @@ class NeuralNetThread {
     kUpdate,
     kStartRound,
     kTrainProp,
+    kTrainForward,
+    kTrainBackprop,
     kPredForward,
     kCopyNode,
+    kCopyLabel,
     kCopyLayer,
     kSetWeight,
     kGetWeight,
@@ -541,6 +628,23 @@ class NeuralNetThread {
       case kUpdate: net_->Update(iparam_epoch); return;
       case kStartRound: net_->StartRound(static_cast<int>(iparam_epoch)); return;
       case kSyncParam: net_->SyncParam(); return;
+      case kCopyLabel: net_->CopyLabelInfo(iparam_t, iparam_label_info); return;
+      case kTrainForward: {
+        if (iparam_batch.size(0) == 0) return;
+        net_->Forward(true, iparam_batch, iparam_extra_data, iparam_need_sync, iparam_t, iparam_first);
+        stream->Wait();
+        return;
+      }
+      case kTrainBackprop: {
+        for (index_t i = 0; i < oparam_req.size(); ++i) {
+          index_t id = oparam_req[i].first + (oparam_req[i].first < 0 ? net_->nodes.size() : 0);
+          CHECK(id < net_->nodes.size());
+          mshadow::Copy(oparam_req[i].second, net_->nodes[id].data, stream);
+        }
+        net_->Backprop(iparam_flag, iparam_need_update, iparam_epoch, iparam_t, iparam_first);
+        stream->Wait();
+        return;
+      }
       case kTrainProp: {
         if (iparam_batch.size(0) == 0) return;
         net_->Forward(true, iparam_batch, iparam_extra_data, iparam_need_sync);
@@ -653,6 +757,14 @@ class NeuralNetThread {
   int seed;
   // whether the implementation is backed by a new thread
   const bool new_thread;
+  // trunk size
+  int trunk_size;
+  // time (RNN)
+  int iparam_t;
+  // first flag (RNN)
+  bool iparam_first;
+  // label info
+  layer::LabelInfo iparam_label_info;
 };
 }  // namespace nnet
 }  // namespace cxxnet
