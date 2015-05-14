@@ -68,14 +68,14 @@ public:
       if (c.type == layer::kLSTM) {
         c.nodes_in.resize(3);
         c.nodes_out.resize(7);
-        size_t nd_size = extra_nodes.size();
-        extra_nodes.resize(nd_size + 1);
-        c.nodes_out[1] = &extra_nodes[nd_size];
+        size_t nd_size = Parent::extra_nodes.size();
+        Parent::extra_nodes.resize(nd_size + 1);
+        c.nodes_out[1] = &(this->Parent::extra_nodes[nd_size]);
         for (size_t  d = 2; d < 7; ++d) {
           if (create_layer) {
-            nd_size = extra_nodes.size();
-            extra_nodes.resize(nd_size + 1);
-            c.nodes_out[d] = &extra_nodes[nd_size];
+            nd_size = Parent::extra_nodes.size();
+            Parent::extra_nodes.resize(nd_size + 1);
+            c.nodes_out[d] = &(this->Parent::extra_nodes[nd_size]);
           } else {
             c.nodes_out[d] = NULL;
           }
@@ -126,7 +126,7 @@ private:
       }
     }
   }
-  void PrepBacprop(int t) {
+  void PrepBackprop(int t) {
     if (t == Parent::trunk_size - 1) {
       for (size_t i = 0; i < Parent::connections.size(); ++i) {
         if (Parent::connections[i].type == layer::kLSTM) {
@@ -136,9 +136,9 @@ private:
         }
       }
     }
-    for (size_t i = 0; i < snapshots[t]->connections.size(); ++i) {
+    for (size_t i = 0; i < Parent::snapshots[t]->connections.size(); ++i) {
       layer::Connection<xpu> &now_c  = Parent::snapshots[t]->connections[i];
-      layer::Connection<xpu> &last_c = t == trunk_size - 1 ? Parent::connections[i] : Parent::snapshots[t + 1]->connections[i];
+      layer::Connection<xpu> &last_c = t == Parent::trunk_size - 1 ? Parent::connections[i] : Parent::snapshots[t + 1]->connections[i];
       if (now_c.type == layer::kLSTM) {
         for (int j = 2; j < 7; ++j) {
           now_c.nodes_out[j] = last_c.nodes_out[j];

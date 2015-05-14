@@ -17,6 +17,7 @@
 #include "../utils/thread.h"
 #include "./nnet_config.h"
 #include "./neural_net-inl.hpp"
+#include "./neural_net_lstm-inl.hpp"
 namespace cxxnet {
 namespace nnet {
 /*!
@@ -37,7 +38,8 @@ class NeuralNetThread {
                   int net_type = 0)
       : cfg(cfg), pserver(ps),
         device_id(device_id), batch_size(batch_size),
-        seed(seed), new_thread(new_thread) {
+        seed(seed), new_thread(new_thread), trunk_size(trunk_size),
+        net_type(net_type) {
     net_ = NULL;
     if (new_thread) {
       destroy_signal = false;
@@ -49,7 +51,11 @@ class NeuralNetThread {
     } else {
       mshadow::InitTensorEngine<xpu>(device_id);
       stream = mshadow::NewStream<xpu>();
-      net_ = new NeuralNet<xpu>(cfg, batch_size, seed, stream, trunk_size);
+      if (net_type == kMLP) {
+        net_ = new NeuralNet<xpu>(cfg, batch_size, seed, stream, trunk_size);
+      } else if (net_type == kLSTM) {
+        net_ = new NeuralNetLSTM<xpu>(cfg, batch_size, seed, stream, trunk_size);
+      }
     }
   }
   // destructor
@@ -237,7 +243,11 @@ class NeuralNetThread {
     mshadow::InitTensorEngine<xpu>(device_id);
     stream = mshadow::NewStream<xpu>();
     // allocate net
-    net_ = new NeuralNet<xpu>(cfg, batch_size, seed, stream);
+    if (net_type == kMLP) {
+      net_ = new NeuralNet<xpu>(cfg, batch_size, seed, stream);
+    } else {
+      net_ = new NeuralNetLSTM<xpu>(cfg, batch_size, seed, stream, trunk_size);
+    }
     // tell the master that net is created
     job_end.Post();
     while (!destroy_signal) {
@@ -409,6 +419,8 @@ class NeuralNetThread {
   const bool new_thread;
   // trunk size
   int trunk_size;
+  // net type
+  int net_type;
   // time (RNN)
   int iparam_t;
   // first flag (RNN)

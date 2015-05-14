@@ -103,6 +103,9 @@ class INetTrainer{
                          const char *weight_tag) = 0;
 };
 
+/*! \brief enum */
+const int kMLP = 0;
+const int kLSTM = 1;
 /*!
  * \brief create a net implementation
  * \param net_type network type, used to select trainer variants
