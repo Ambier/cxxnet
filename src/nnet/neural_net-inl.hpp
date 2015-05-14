@@ -55,11 +55,11 @@ struct NeuralNet {
     this->max_batch = batch_size;
     rnd.set_stream(stream);
     label_info.name2findex = &cfg.label_name_map;
-    snapshots.resize(trunk_size);
-    for (int i = 0; i < trunk_size; ++i) {
-      NeuralNet<xpu> *pnet = new NeuralNet(cfg, batch_size, seed, stream, 0);
-      snapshots[i] = pnet;
-    }
+    //snapshots.resize(trunk_size);
+    //for (int i = 0; i < trunk_size; ++i) {
+    //   NeuralNet<xpu> *pnet = new NeuralNet(cfg, batch_size, seed, stream, 0);
+    //   snapshots[i] = pnet;
+    //}
   }
   virtual ~NeuralNet(void) {
     this->FreeSpace();
@@ -77,9 +77,12 @@ struct NeuralNet {
   }
 
   /*! \brief initial model parameters in the beginning */
-  inline void InitModel(void) {
-    this->InitNet();
+  virtual void InitModel(bool flag = true) {
+    this->InitNet(flag);
     this->ConfigConntions();
+    this->SetModel();
+  }
+  inline void SetModel() {
     for (size_t i = 0; i < connections.size(); ++i) {
       if (this->cfg.layers[i].name != "") {
         utils::TrackerPrintf("Initializing layer: %s\n", this->cfg.layers[i].name.c_str());

@@ -139,6 +139,7 @@ class CXXNetLearnTask {
       if (!strcmp(val, "gpu:rank")) return;
     }
     if (!strcmp(name, "test_io"))           test_io = atoi(val);
+    if (!strcmp(name, "trunk_size")) trunk_size = atoi(val);
     if (!strcmp(name, "extract_node_name"))         extract_node_name = val;
     if (!strcmp(name, "extract_layer_name"))         extract_layer_name = val;
     if (!strcmp(name, "weight_filename"))         weight_filename = val;
@@ -470,16 +471,16 @@ class CXXNetLearnTask {
           if (++ sample_counter  % print_step == 0) {
             elapsed = (long)(time(NULL) - start);
             if (!silent) {
-	      std::ostringstream os;
-	      os << "round " << std::setw(8) << start_counter - 1
-		 << ":[" << std::setw(8) << sample_counter << "] " << elapsed << " sec elapsed";
-	      if (print_tracker) {
-		utils::TrackerPrint(os.str().c_str());
-	      } else {
-		printf("\r                                                               \r");
-		printf("%s", os.str().c_str());
-		fflush(stdout);
-	      }
+              std::ostringstream os;
+              os << "round " << std::setw(8) << start_counter - 1
+                  << ":[" << std::setw(8) << sample_counter << "] " << elapsed << " sec elapsed";
+              if (print_tracker) {
+                utils::TrackerPrint(os.str().c_str());
+              } else {
+                printf("\r                                                               \r");
+                printf("%s", os.str().c_str());
+                fflush(stdout);
+              }
             }
           }
         }
@@ -498,11 +499,10 @@ class CXXNetLearnTask {
           utils::TrackerPrint(os.str());
         }
         elapsed = (unsigned long)(time(NULL) - start);
-	if (is_root) {
-	  this->SaveModel();
-	}
+        if (is_root) {
+          this->SaveModel();
+        }
       }
-
       if (!silent) {
         printf("\nupdating end, %lu sec in all\n", elapsed);
       }
@@ -571,6 +571,10 @@ class CXXNetLearnTask {
   std::string weight_filename;
   /*! \brief wmat of bias */
   std::string weight_name;
+  /*! \brief trunk size (RNN) */
+  int trunk_size;
+  /*! \brief time (RNN) */
+  int t;
  };
 }  // namespace cxxnet
 

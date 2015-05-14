@@ -6,7 +6,7 @@
 #include "./nnet.h"
 #include "../utils/io.h"
 #include "../utils/metric.h"
-#include "./neural_net-inl.hpp"
+#include "./neural_net_thread-inl.hpp"
 
 #if MSHADOW_DIST_PS
 #include "gflags/gflags.h"
@@ -162,7 +162,6 @@ class CXXNetThreadTrainer : public INetTrainer {
     mshadow::index_t step = std::max(static_cast<mshadow::index_t>((batch_size + ndevice - 1) / ndevice), \
                                      static_cast<mshadow::index_t>(1UL));
     bool need_sync = sample_counter % update_period == 0;
-    bool need_update = false;
     layer::LabelInfo info = GetLabelInfo(data);
     this->InitEvalReq(eval_req);
     for (mshadow::index_t i = nets_.size(); i != 0; --i) {
