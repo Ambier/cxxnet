@@ -27,8 +27,8 @@ class LSTMLayer : public ILayer<xpu> {
                                 const std::vector<Node<xpu>*> &nodes_out,
                                 ConnectState<xpu> *p_cstate) {
       // input: x_t, y_{t-1}, c_{t-1}
-      // output: y_t, c_t, delta_z, delta_i, delta_o, delta_f, delta_c
-      // state: z_no_act, i_no_act, f_no_act, o_no_act, c_t_no_act
+      // output: y_t, c_t, delta_z_{t+1}, delta_i_{t+1}, delta_o_{t+1}, delta_f_{t+1}, delta_c_{t+1}
+      // state: z_no_act, i_no_act, f_no_act, o_no_act, c_t_no_act, y_back
       // Or we can save the act to speed up?
       const int batch_size = nodes_in[0]->data.shape_[0];
       mshadow::Shape<4> oshape = mshadow::Shape4(batch_size, 1, 1, param_.num_hidden);
@@ -180,8 +180,8 @@ class LSTMLayer : public ILayer<xpu> {
                        const std::vector<Node<xpu>*> &nodes_out,
                        ConnectState<xpu> *p_cstate) {
       mshadow::Tensor<xpu, 2> x = nodes_in[0]->mat();
-      mshadow::Tensor<xpu, 2> last_c = nodes_in[1]->mat();
-      mshadow::Tensor<xpu, 2> last_y = nodes_in[2]->mat();
+      mshadow::Tensor<xpu, 2> last_y = nodes_in[1]->mat();
+      mshadow::Tensor<xpu, 2> last_c = nodes_in[2]->mat();
       mshadow::Tensor<xpu, 2> y = nodes_out[0]->mat();
       mshadow::Tensor<xpu, 2> c_t = nodes_out[1]->mat();
 
@@ -219,14 +219,14 @@ class LSTMLayer : public ILayer<xpu> {
                         ConnectState<xpu> *p_cstate) {
       using namespace mshadow::expr;
       mshadow::Tensor<xpu, 2> delta_y = nodes_out[0]->mat();
-      // mshadow::Tensor<xpu, 2> next_c = nodes_out[1]->mat();
-      mshadow::Tensor<xpu, 2> delta_z = nodes_out[3]->mat();
-      mshadow::Tensor<xpu, 2> delta_i = nodes_out[4]->mat();
-      mshadow::Tensor<xpu, 2> delta_o = nodes_out[5]->mat();
-      mshadow::Tensor<xpu, 2> delta_f = nodes_out[6]->mat();
-      mshadow::Tensor<xpu, 2> delta_c = nodes_out[7]->mat();
+      mshadow::Tensor<xpu, 2> delta_z = nodes_out[2]->mat();
+      mshadow::Tensor<xpu, 2> delta_i = nodes_out[3]->mat();
+      mshadow::Tensor<xpu, 2> delta_o = nodes_out[4]->mat();
+      mshadow::Tensor<xpu, 2> delta_f = nodes_out[5]->mat();
+      mshadow::Tensor<xpu, 2> delta_c = nodes_out[6]->mat();
 
       mshadow::Tensor<xpu, 2> x = nodes_in[0]->mat();
+      mshadow::Tensor<xpu, 2> last_c = nodes_in[2]->mat();
 
       mshadow::Tensor<xpu, 2> z = p_cstate->states[0].FlatTo2D();
       mshadow::Tensor<xpu, 2> i = p_cstate->states[1].FlatTo2D();
@@ -235,10 +235,10 @@ class LSTMLayer : public ILayer<xpu> {
       mshadow::Tensor<xpu, 2> c = p_cstate->states[4].FlatTo2D();
       mshadow::Tensor<xpu, 2> y_back = p_cstate->states[5].FlatTo2D();
 
-      gUi_ += dot(delta_i, y_back);
-      gUf_ += dot(delta_f, y_back);
-      gUz_ += dot(delta_z, y_back);
-      gUo_ += dot(delta_o, y_back);
+      gUi_ += dot(delta_i.T(), y_back);
+      gUf_ += dot(delta_f.T(), y_back);
+      gUz_ += dot(delta_z.T(), y_back);
+      gUo_ += dot(delta_o.T(), y_back);
 
       delta_y += dot(delta_z, Uz_);
       delta_y += dot(delta_i, Ui_);
@@ -247,7 +247,7 @@ class LSTMLayer : public ILayer<xpu> {
 
       delta_o = delta_y * F<COp>(c) * F<OOpGrad>(o);
       delta_c = delta_y * F<OOp>(o) * F<COpGrad>(c) + delta_c * delta_f;
-      delta_f = delta_c * F<COp>(c) * F<FOpGrad>(f);
+      delta_f = delta_c * last_c * F<FOpGrad>(f);
       delta_i = delta_c * F<ZOp>(z) * F<IOpGrad>(i);
       delta_z = delta_c * F<IOp>(i) * F<ZOpGrad>(z);
 
