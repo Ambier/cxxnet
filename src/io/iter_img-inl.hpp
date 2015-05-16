@@ -66,7 +66,7 @@ public:
       std::random_shuffle(order_.begin(), order_.end());
     }
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     if (data_index_ < static_cast<int>(order_.size())) {
       size_t index = order_[data_index_];
       if (path_imgdir_.length() == 0) {
@@ -89,7 +89,7 @@ public:
     return out_;
   }
 protected:
-  inline static void LoadImage(mshadow::TensorContainer<cpu,3> &img, 
+  inline static void LoadImage(mshadow::TensorContainer<cpu,3> &img,
           DataInst &out,
           const char *fname) {
     cv::Mat res = cv::imread(fname);

@@ -48,7 +48,7 @@ class DenseBufferIterator : public IIterator<DataBatch> {
   virtual void BeforeFirst(void) {
     data_index_ = 0;
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     if (data_index_ < buffer_.size()) {
       data_index_ += 1;
       return true;

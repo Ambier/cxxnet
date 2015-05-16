@@ -60,7 +60,7 @@ class MNISTIterator: public IIterator<DataBatch> {
   virtual void BeforeFirst(void) {
     this->loc_ = 0;
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     if (loc_ + batch_size_ <= img_.size(0)) {
       out_.data.dptr_ = img_[loc_].dptr_;
       out_.label.dptr_ = &labels_[loc_];
@@ -76,7 +76,7 @@ class MNISTIterator: public IIterator<DataBatch> {
   }
  private:
   inline void LoadImage(void) {
-    
+
     dmlc::Stream *stdimg = dmlc::Stream::Create(path_img.c_str(), "r");
     ReadInt(stdimg);
     int image_count = ReadInt(stdimg);

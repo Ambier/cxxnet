@@ -62,7 +62,7 @@ public:
     }
     head_ = 1;
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     out_.num_batch_padd = 0;
 
     // skip read if in head version
@@ -153,7 +153,7 @@ public :
   virtual void BeforeFirst() {
     itr.BeforeFirst();
   }
-  virtual bool Next() {
+  virtual int Next() {
     if (itr.Next(out_)) {
       return true;
     } else {

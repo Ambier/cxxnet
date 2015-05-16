@@ -55,23 +55,27 @@ public:
     for (index_t i = 0; i < batch_size; ++i) {
       size_t id = (i + top) % buf.size();
       if (loc[i] == buf[id].size()) {
-        out.data[i][eof_idx] = 1.0f;
+        out.data[i][0][0][eof_idx] = 1.0f;
         out.label[i][0] = buf[id][0];
         loc[i] = 0;
       } else {
-        out.data[i][buf[id][loc[i]]] = 1.0f;
-        if (loc[i] + 1 == buf.size()) {
+        out.data[i][0][0][buf[id][loc[i]]] = 1.0f;
+        if (loc[i] + 1 == buf[id].size()) {
           out.label[i][0] = eof_idx;
         } else {
-          out.label[i][0] = buf[id][loc[i + 1]];
+          out.label[i][0] = buf[id][loc[i] + 1];
         }
       }
+      loc[i]++;
     }
-    top += batch_size;
     t += 1;
     if (top > buf.size()) return 0;
     if (t >= max_t) {
       t = 0;
+      top += batch_size;
+      for (index_t i = 0; i< batch_size; ++i) {
+        loc[i] = 0;
+      }
       return 2;
     }
     return 1;

@@ -94,7 +94,7 @@ public:
     this->LoadNextPage();
     flag_ = true;
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     if (!flag_) return flag_;
     while (fscanf(fplst_, "%u", &out_.index) == 1) {
       for (int i = 0; i < label_width_; ++i) {

@@ -15,6 +15,7 @@
 #include "iter_mem_buffer-inl.hpp"
 #include "iter_attach_txt-inl.hpp"
 #include "iter_csv-inl.hpp"
+#include "iter_doc_batch-inl.hpp"
 #if CXXNET_USE_OPENCV
 #include "iter_thread_imbin-inl.hpp"
 #include "iter_thread_imbin_x-inl.hpp"
@@ -60,6 +61,11 @@ IIterator<DataBatch> *CreateIterator(const std::vector< std::pair<std::string, s
       if (!strcmp(val, "img")) {
         CHECK(it == NULL) <<  "image list iterator can not chain over other iterator";
         it = new BatchAdaptIterator(new AugmentIterator(new ImageIterator()));
+        continue;
+      }
+      if (!strcmp(val, "doc")) {
+        CHECK(it == NULL) <<  "doc iterator can not chain over other iterator";
+        it = new DocBatchIterator();
         continue;
       }
       #endif

@@ -70,7 +70,7 @@ public:
   virtual void BeforeFirst(void) {
     itr.BeforeFirst();
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     return itr.Next(out_);
   }
   virtual const DataInst &Value(void) const {

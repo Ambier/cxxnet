@@ -55,7 +55,7 @@ class AttachTxtIterator : public IIterator<DataBatch> {
   virtual void BeforeFirst(void) {
     base_->BeforeFirst();
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     if (base_->Next()) {
       out_ = base_->Value();
       out_.extra_data.clear();
@@ -64,7 +64,7 @@ class AttachTxtIterator : public IIterator<DataBatch> {
         if (id_map_.find(out_.inst_index[top]) != id_map_.end()) {
           int start = id_map_[out_.inst_index[top]] * dim_;
           for (int i = 0; i < dim_; ++i) {
-            extra_data_[top][0][0][i] = all_data_[start++];  
+            extra_data_[top][0][0][i] = all_data_[start++];
           }
         }
       }

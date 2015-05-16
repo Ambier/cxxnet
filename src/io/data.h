@@ -30,7 +30,7 @@ public:
   /*! \brief set before first of the item */
   virtual void BeforeFirst(void) = 0;
   /*! \brief move to next item */
-  virtual bool Next(void) = 0;
+  virtual int Next(void) = 0;
   /*! \brief get current data */
   virtual const DType &Value(void) const = 0;
 public:

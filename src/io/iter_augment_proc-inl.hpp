@@ -93,7 +93,7 @@ public:
   virtual const DataInst &Value(void) const {
     return out_;
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     if (!this->Next_()) return false;
     return true;
   }

@@ -81,7 +81,7 @@ public:
   virtual void BeforeFirst(void) {
     itrimg.BeforeFirst();
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     if (itrimg.Next(outimg_)) {
       out_.index = outimg_->inst_index;
       out_.label = outimg_->label;

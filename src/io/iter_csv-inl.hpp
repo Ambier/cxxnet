@@ -57,7 +57,7 @@ public:
     data_index_ = 0;
     fseek(fplst_, 0, SEEK_SET);
   }
-  virtual bool Next(void) {
+  virtual int Next(void) {
     if (fscanf(fplst_, "%f", BeginPtr(labels_)) != EOF) {
       for (int i = 1; i < label_width_; ++i){
         utils::Check(fscanf(fplst_, ",%f", &labels_[i]) == 1,
