@@ -116,6 +116,18 @@ private:
         }
       }
     }
+    if (t == 0 && is_first == false) {
+      for (size_t i = 0; i < Parent::connections.size(); ++i) {
+        if (Parent::connections[i].type == layer::kLSTM) {
+          mshadow::Copy(Parent::connections[i].nodes_out[0]->data,
+                        Parent::snapshots[Parent::trunk_size - 1]->connections[i].nodes_out[0]->data,
+                        Parent::connections[i].nodes_out[0]->data.stream_);
+          mshadow::Copy(Parent::connections[i].nodes_out[1]->data,
+                        Parent::snapshots[Parent::trunk_size - 1]->connections[i].nodes_out[1]->data,
+                        Parent::connections[i].nodes_out[0]->data.stream_);
+        }
+      }
+    }
     for (size_t i = 0; i < Parent::snapshots[t]->connections.size(); ++i) {
       layer::Connection<xpu> &now_c  = Parent::snapshots[t]->connections[i];
       layer::Connection<xpu> &last_c = t == 0 ? Parent::connections[i] : Parent::snapshots[t - 1]->connections[i];

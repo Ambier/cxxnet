@@ -27,7 +27,7 @@ class CXXNetLearnTask {
  public:
   CXXNetLearnTask(void) {
     this->task = "train";
-    this->net_type = 0;
+    this->net_type = nnet::kMLP;
     this->net_trainer = NULL;
     this->itr_train = NULL;
     this->itr_pred  = NULL;
@@ -47,6 +47,7 @@ class CXXNetLearnTask {
     weight_name = "wmat";
     extract_layer_name = "";
     weight_filename = "";
+    trunk_size = 0;
 #if MSHADOW_USE_CUDA
     this->SetParam("dev", "gpu");
 #else
@@ -122,7 +123,10 @@ class CXXNetLearnTask {
 
   inline void SetParam(const char *name , const char *val) {
     if (!strcmp(val, "default")) return;
-    if (!strcmp(name,"net_type"))            net_type = atoi(val);
+    if (!strcmp(name,"net_type")) {
+      if (!strcmp(val, "mlp")) net_type = nnet::kMLP;
+      if (!strcmp(val, "lstm")) net_type = nnet::kLSTM;
+    }
     if (!strcmp(name,"reset_net_type"))      reset_net_type = atoi(val);
     if (!strcmp(name,"print_step"))          print_step = atoi(val);
     if (!strcmp(name,"continue"))            continue_training = atoi(val);
@@ -420,8 +424,25 @@ class CXXNetLearnTask {
     fclose(fm);
     printf("finished prediction, write into %s\n", name_pred.c_str());
   }
-
+  inline void RnnUpdate(const DataBatch &data, int iter_state, int &t, bool start) {
+    bool is_first = start;
+    if (is_first) t = 0;
+    if (iter_state == 1 && !start) t++;
+    if (iter_state == 2) {
+      t = 0;
+      is_first = true;
+    }
+    if (t % trunk_size == 0 && !start) {
+      for (int i = trunk_size - 1; i >= 0; --i) {
+        net_trainer->Backprop(i, i == trunk_size - 1);
+      }
+    }
+    net_trainer->Forward(data, t % trunk_size, is_first);
+  }
   inline void TaskTrain(void) {
+    if (net_type != nnet::kMLP) {
+      utils::Check(trunk_size > 0, "RNN must set trunk_size");
+    }
     bool is_root = true;
     bool print_tracker = false;
 #if MSHADOW_DIST_PS
@@ -464,9 +485,18 @@ class CXXNetLearnTask {
         int sample_counter = 0;
         net_trainer->StartRound(start_counter);
         itr_train->BeforeFirst();
-        while (itr_train->Next()) {
+        int iter_state = 2;
+        bool iter_start_flag = true;
+        while (iter_state) {
+          iter_state = itr_train->Next();
           if (test_io == 0) {
-            net_trainer->Update(itr_train->Value());
+            if (net_type == nnet::kMLP) {
+              net_trainer->Update(itr_train->Value());
+            } else {
+              if (iter_state == 2) iter_start_flag = true;
+              this->RnnUpdate(itr_train->Value(), iter_state, this->seq_time, iter_start_flag);
+              iter_start_flag = false;
+            }
           }
           if (++ sample_counter  % print_step == 0) {
             elapsed = (long)(time(NULL) - start);
@@ -575,7 +605,7 @@ class CXXNetLearnTask {
   /*! \brief trunk size (RNN) */
   int trunk_size;
   /*! \brief time (RNN) */
-  int t;
+  int seq_time;
  };
 }  // namespace cxxnet
 
