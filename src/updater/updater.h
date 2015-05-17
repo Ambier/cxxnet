@@ -147,7 +147,7 @@ void CreateAsyncUpdaters(int layer_index,
  *   key(layer[i].bias) == i * kDataKeyStep + 1
  *   key(layer[i].bias) == i * kDataKeyStep + 1
  */
-static const int kDataKeyStep = 4;
+static const int kDataKeyStep = 6;
 /*!
  * \brief encode layer index and weight tag into the unique key
  * \param layer_index index of layer
@@ -156,7 +156,8 @@ static const int kDataKeyStep = 4;
 inline int EncodeDataKey(int layer_index, const char *tag) {
   if (!strcmp(tag, "bias")) return layer_index * kDataKeyStep + 1;
   if (!strcmp(tag, "wmat")) return layer_index * kDataKeyStep + 0;
-  utils::Error("EncodeDataKey: only support weight tag: wmat or bias");
+  if (!strcmp(tag, "umat")) return layer_index * kDataKeyStep + 2;
+  utils::Error("EncodeDataKey: only support weight tag: wmat/umat/bias");
   return 0;
 }
 /*!
@@ -168,6 +169,7 @@ inline const char *DecodeTag(int key) {
   switch (key % updater::kDataKeyStep) {
     case 0: return "wmat";
     case 1: return "bias";
+    case 2: return "umat";
     default: utils::Error("invalid key"); return "";
   }
 }

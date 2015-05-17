@@ -44,141 +44,77 @@ class LSTMLayer : public ILayer<xpu> {
       }
     }
     virtual void ApplyVisitor(typename ILayer<xpu>::IVisitor *pvisitor) {
-      pvisitor->Visit("wi", Wi_, gWi_);
-      pvisitor->Visit("wf", Wf_, gWf_);
-      pvisitor->Visit("wo", Wo_, gWo_);
-      pvisitor->Visit("wz", Wz_, gWz_);
+      pvisitor->Visit("wmat", W_, gW_);
+      pvisitor->Visit("umat", U_, gU_);
       if (param_.no_bias == 0) {
-        pvisitor->Visit("bi", bi_, gbi_);
-        pvisitor->Visit("bf", bf_, gbf_);
-        pvisitor->Visit("bo", bo_, gbo_);
-        pvisitor->Visit("bz", bz_, gbz_);
+        pvisitor->Visit("bias", b_, gb_);
       }
     }
     virtual void InitModel() {
-      Wi_.Resize(mshadow::Shape2(param_.num_hidden, param_.num_input_node));
-      Ui_.Resize(mshadow::Shape2(param_.num_hidden, param_.num_hidden));
-      bi_.Resize(mshadow::Shape1(param_.num_hidden));
-      Wf_.Resize(Wi_.shape_);
-      Uf_.Resize(Ui_.shape_);
-      bf_.Resize(bi_.shape_);
-      Wo_.Resize(Wi_.shape_);
-      Uo_.Resize(Ui_.shape_);
-      bo_.Resize(bi_.shape_);
-      Wz_.Resize(Wi_.shape_);
-      Uz_.Resize(Ui_.shape_);
-      bz_.Resize(bi_.shape_);
-      gWi_.Resize(Wi_.shape_);
-      gUi_.Resize(Ui_.shape_);
-      gbi_.Resize(bi_.shape_);
-      gWf_.Resize(Wi_.shape_);
-      gUf_.Resize(Ui_.shape_);
-      gbf_.Resize(bi_.shape_);
-      gWo_.Resize(Wi_.shape_);
-      gUo_.Resize(Ui_.shape_);
-      gbo_.Resize(bi_.shape_);
-      gWz_.Resize(Wi_.shape_);
-      gUz_.Resize(Ui_.shape_);
-      gbz_.Resize(bi_.shape_);
-      gWi_ = 0.0f;
-      gUi_ = 0.0f;
-      gbi_ = 0.0f;
-      gWz_ = 0.0f;
-      gUz_ = 0.0f;
-      gbz_ = 0.0f;
-      gWf_ = 0.0f;
-      gUf_ = 0.0f;
-      gbf_ = 0.0f;
-      gWo_ = 0.0f;
-      gUo_ = 0.0f;
-      gbo_ = 0.0f;
+      W_.Resize(mshadow::Shape3(4, param_.num_hidden, param_.num_input_node));
+      U_.Resize(mshadow::Shape3(4, param_.num_hidden, param_.num_hidden));
+      b_.Resize(mshadow::Shape2(2, param_.num_hidden));
+      for (int i = 0; i < 4; ++i) {
+        mshadow::Tensor<xpu, 2> wmat = W_[i];
+        mshadow::Tensor<xpu, 2> umat = U_[i];
+        param_.RandInitWeight(this->prnd_, wmat, wmat.size(1), wmat.size(0));
+        param_.RandInitWeight(this->prnd_, umat, umat.size(1), umat.size(0));
+      }
+      b_ = param_.init_bias;
+      gW_.Resize(W_.shape_);
+      gU_.Resize(U_.shape_);
+      gb_.Resize(b_.shape_);
+      gW_ = 0.0f;
+      gU_ = 0.0f;
+      gb_ = 0.0f;
     }
     virtual void SaveModel(utils::IStream &fo) const {
       fo.Write(&param_, sizeof(LayerParam));
-      Wi_.SaveBinary(fo);
-      Wf_.SaveBinary(fo);
-      Wo_.SaveBinary(fo);
-      Wz_.SaveBinary(fo);
-      Ui_.SaveBinary(fo);
-      Uf_.SaveBinary(fo);
-      Uo_.SaveBinary(fo);
-      Uz_.SaveBinary(fo);
-      bi_.SaveBinary(fo);
-      bf_.SaveBinary(fo);
-      bo_.SaveBinary(fo);
-      bz_.SaveBinary(fo);
+      W_.SaveBinary(fo);
+      U_.SaveBinary(fo);
+      b_.SaveBinary(fo);
     }
     virtual void LoadModel(utils::IStream &fi) {
       utils::Check(fi.Read(&param_, sizeof(LayerParam)) != 0,
                    "FullConnectLayer:LoadModel invalid model file");
-      Wi_.LoadBinary(fi);
-      Wf_.LoadBinary(fi);
-      Wo_.LoadBinary(fi);
-      Wz_.LoadBinary(fi);
-      Ui_.LoadBinary(fi);
-      Uf_.LoadBinary(fi);
-      Uo_.LoadBinary(fi);
-      Uz_.LoadBinary(fi);
-      bi_.LoadBinary(fi);
-      bf_.LoadBinary(fi);
-      bo_.LoadBinary(fi);
-      bz_.LoadBinary(fi);
-      gWi_.Resize(Wi_.shape_);
-      gWf_.Resize(Wf_.shape_);
-      gWo_.Resize(Wo_.shape_);
-      gWz_.Resize(Wz_.shape_);
-      gUi_.Resize(Wi_.shape_);
-      gUf_.Resize(Wf_.shape_);
-      gUo_.Resize(Wo_.shape_);
-      gUz_.Resize(Wz_.shape_);
-      gbi_.Resize(bi_.shape_);
-      gbf_.Resize(bf_.shape_);
-      gbo_.Resize(bo_.shape_);
-      gbz_.Resize(bz_.shape_);
-      gWi_ = 0.0f;
-      gUi_ = 0.0f;
-      gbi_ = 0.0f;
-      gWz_ = 0.0f;
-      gUz_ = 0.0f;
-      gbz_ = 0.0f;
-      gWf_ = 0.0f;
-      gUf_ = 0.0f;
-      gbf_ = 0.0f;
-      gWo_ = 0.0f;
-      gUo_ = 0.0f;
-      gbo_ = 0.0f;
+      W_.LoadBinary(fi);
+      U_.LoadBinary(fi);
+      b_.LoadBinary(fi);
+      gW_.Resize(W_.shape_);
+      gU_.Resize(U_.shape_);
+      gb_.Resize(b_.shape_);
+      gW_ = 0.0f;
+      gU_ = 0.0f;
+      gb_ = 0.0f;
 
     }
     virtual void SetStream(mshadow::Stream<xpu> *stream) {
-      Wi_.set_stream(stream);
-      Wf_.set_stream(stream);
-      Wo_.set_stream(stream);
-      Wz_.set_stream(stream);
-      gWi_.set_stream(stream);
-      gWf_.set_stream(stream);
-      gWo_.set_stream(stream);
-      gWz_.set_stream(stream);
-      Ui_.set_stream(stream);
-      Uf_.set_stream(stream);
-      Uo_.set_stream(stream);
-      Uz_.set_stream(stream);
-      gUi_.set_stream(stream);
-      gUf_.set_stream(stream);
-      gUo_.set_stream(stream);
-      gUz_.set_stream(stream);
-      bi_.set_stream(stream);
-      bf_.set_stream(stream);
-      bo_.set_stream(stream);
-      bz_.set_stream(stream);
-      gbi_.set_stream(stream);
-      gbf_.set_stream(stream);
-      gbo_.set_stream(stream);
-      gbz_.set_stream(stream);
+      W_.set_stream(stream);
+      U_.set_stream(stream);
+      b_.set_stream(stream);
+      gW_.set_stream(stream);
+      gU_.set_stream(stream);
+      gb_.set_stream(stream);
     }
     virtual void Forward(bool is_train,
                        const std::vector<Node<xpu>*> &nodes_in,
                        const std::vector<Node<xpu>*> &nodes_out,
                        ConnectState<xpu> *p_cstate) {
+      mshadow::Tensor<xpu, 2> Wi_ = W_[0];
+      mshadow::Tensor<xpu, 2> Wf_ = W_[1];
+      mshadow::Tensor<xpu, 2> Wo_ = W_[2];
+      mshadow::Tensor<xpu, 2> Wz_ = W_[3];
+
+      mshadow::Tensor<xpu, 2> Ui_ = U_[0];
+      mshadow::Tensor<xpu, 2> Uf_ = U_[1];
+      mshadow::Tensor<xpu, 2> Uo_ = U_[2];
+      mshadow::Tensor<xpu, 2> Uz_ = U_[3];
+
+      mshadow::Tensor<xpu, 1> bi_ = b_[0];
+      mshadow::Tensor<xpu, 1> bf_ = b_[1];
+      mshadow::Tensor<xpu, 1> bo_ = b_[2];
+      mshadow::Tensor<xpu, 1> bz_ = b_[3];
+
       mshadow::Tensor<xpu, 2> x = nodes_in[0]->mat();
       mshadow::Tensor<xpu, 2> last_y = nodes_in[1]->mat();
       mshadow::Tensor<xpu, 2> last_c = nodes_in[2]->mat();
@@ -218,6 +154,32 @@ class LSTMLayer : public ILayer<xpu> {
                         const std::vector<Node<xpu>*> &nodes_out,
                         ConnectState<xpu> *p_cstate) {
       using namespace mshadow::expr;
+
+      mshadow::Tensor<xpu, 2> Wi_ = W_[0];
+      mshadow::Tensor<xpu, 2> Wf_ = W_[1];
+      mshadow::Tensor<xpu, 2> Wo_ = W_[2];
+      mshadow::Tensor<xpu, 2> Wz_ = W_[3];
+
+      mshadow::Tensor<xpu, 2> Ui_ = U_[0];
+      mshadow::Tensor<xpu, 2> Uf_ = U_[1];
+      mshadow::Tensor<xpu, 2> Uo_ = U_[2];
+      mshadow::Tensor<xpu, 2> Uz_ = U_[3];
+
+      mshadow::Tensor<xpu, 2> gWi_ = gW_[0];
+      mshadow::Tensor<xpu, 2> gWf_ = gW_[1];
+      mshadow::Tensor<xpu, 2> gWo_ = gW_[2];
+      mshadow::Tensor<xpu, 2> gWz_ = gW_[3];
+
+      mshadow::Tensor<xpu, 2> gUi_ = gU_[0];
+      mshadow::Tensor<xpu, 2> gUf_ = gU_[1];
+      mshadow::Tensor<xpu, 2> gUo_ = gU_[2];
+      mshadow::Tensor<xpu, 2> gUz_ = gU_[3];
+
+      mshadow::Tensor<xpu, 1> gbi_ = gb_[0];
+      mshadow::Tensor<xpu, 1> gbf_ = gb_[1];
+      mshadow::Tensor<xpu, 1> gbo_ = gb_[2];
+      mshadow::Tensor<xpu, 1> gbz_ = gb_[3];
+
       mshadow::Tensor<xpu, 2> delta_y = nodes_out[0]->mat();
       mshadow::Tensor<xpu, 2> delta_z = nodes_out[2]->mat();
       mshadow::Tensor<xpu, 2> delta_i = nodes_out[3]->mat();
@@ -275,15 +237,15 @@ class LSTMLayer : public ILayer<xpu> {
     /*! \brief random number generator */
     mshadow::Random<xpu> *prnd_;
     /*! \brief weight */
-    mshadow::TensorContainer<xpu, 2> Wi_, Wf_, Wo_, Wz_;
-    mshadow::TensorContainer<xpu, 2> Ui_, Uf_, Uo_, Uz_;
+    mshadow::TensorContainer<xpu, 3> W_;
+    mshadow::TensorContainer<xpu, 3> U_;
     /*! \brief bias */
-    mshadow::TensorContainer<xpu, 1> bi_, bf_, bo_, bz_;
+    mshadow::TensorContainer<xpu, 2> b_;
     /*! \brief weight gradient */
-    mshadow::TensorContainer<xpu, 2> gWi_, gWf_, gWo_, gWz_;
-    mshadow::TensorContainer<xpu, 2> gUi_, gUf_, gUo_, gUz_;
+    mshadow::TensorContainer<xpu, 3> gW_;
+    mshadow::TensorContainer<xpu, 3> gU_;
     /*! \brief bias gradient */
-    mshadow::TensorContainer<xpu, 1> gbi_, gbf_, gbo_, gbz_;
+    mshadow::TensorContainer<xpu, 2> gb_;
 }; // class LSTMLayer
 
 } // namespace layer
