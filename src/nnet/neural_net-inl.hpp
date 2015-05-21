@@ -90,12 +90,12 @@ struct NeuralNet {
         utils::TrackerPrintf("Initializing layer: %d\n", static_cast<int>(i));
       }
       layer::Connection<xpu> &c = connections[i];
-      c.layer->InitConnection(c.nodes_in, c.nodes_out, &c.state);
+      if (c.layer) c.layer->InitConnection(c.nodes_in, c.nodes_out, &c.state);
       c.SetStream(stream);
     }
     for (size_t i = 0; i < connections.size(); ++i) {
       if (connections[i].type != layer::kSharedLayer) {
-        connections[i].layer->InitModel();
+        if (connections[i].layer) connections[i].layer->InitModel();
       }
     }
   }
@@ -299,16 +299,15 @@ struct NeuralNet {
     for (int i = 0; i < cfg.param.num_layers; ++ i) {
       if (connections[i].type == layer::kSharedLayer) continue;
       for (size_t j = 0; j < cfg.defcfg.size(); ++j) {
+        if (connections[i].layer == NULL) continue;
         connections[i].layer->SetParam(cfg.defcfg[j].first.c_str(),
                                        cfg.defcfg[j].second.c_str());
       }
       for (size_t j = 0; j < cfg.layercfg[i].size(); ++j) {
+        if (connections[i].layer == NULL) continue;
         connections[i].layer->SetParam(cfg.layercfg[i][j].first.c_str(),
                                        cfg.layercfg[i][j].second.c_str());
       }
-    }
-    for (size_t i = 0; i < snapshots.size(); ++i) {
-      snapshots[i]->ConfigConntions();
     }
   }
   // adjust batch size to a new value, the batch_size must be smaller than max_batch
@@ -358,6 +357,7 @@ struct NeuralNet {
     for (size_t i = 0; i < snapshots.size(); ++i) {
       snapshots[i]->FreeSpace();
     }
+
     for (size_t i = 0; i < connections.size(); ++i) {
       if (connections[i].type != layer::kSharedLayer) {
         delete connections[i].layer;

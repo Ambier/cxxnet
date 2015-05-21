@@ -124,7 +124,7 @@ class NeuralNetThread {
     iparam_need_sync = need_sync;
     iparam_t = t;
     iparam_first = is_first_trunk;
-    this->task = kTrainProp;
+    this->task = kTrainForward;
     this->ExecTask();
   }
   inline void CopyLabel(int t, const layer::LabelInfo &label_info) {
@@ -268,6 +268,8 @@ class NeuralNetThread {
     }
   }
   inline void TaskDispatch(void) {
+    printf("wtf %d\n", net_type);
+    printf("%p\n", &net_type);
     CHECK(net_ != NULL);
     switch (task) {
       case kInitModel: {
@@ -291,17 +293,27 @@ class NeuralNetThread {
       case kCopyLabel: net_->CopyLabelInfo(iparam_t, iparam_label_info); return;
       case kTrainForward: {
         if (iparam_batch.size(0) == 0) return;
-        net_->Forward(true, iparam_batch, iparam_extra_data, iparam_need_sync, iparam_t, iparam_first);
+        if (net_type == kMLP) {
+          net_->Forward(true, iparam_batch, iparam_extra_data, iparam_need_sync, iparam_t, iparam_first);
+        } else {
+          NeuralNetLSTM<xpu> *pnet = static_cast<NeuralNetLSTM<xpu>*>(net_);
+          pnet->Forward(true, iparam_batch, iparam_extra_data, iparam_need_sync, iparam_t, iparam_first);
+        }
         stream->Wait();
         return;
       }
       case kTrainBackprop: {
-        for (index_t i = 0; i < oparam_req.size(); ++i) {
-          index_t id = oparam_req[i].first + (oparam_req[i].first < 0 ? net_->nodes.size() : 0);
-          CHECK(id < net_->nodes.size());
-          mshadow::Copy(oparam_req[i].second, net_->nodes[id].data, stream);
+        //for (index_t i = 0; i < oparam_req.size(); ++i) {
+        //  index_t id = oparam_req[i].first + (oparam_req[i].first < 0 ? net_->nodes.size() : 0);
+        //  CHECK(id < net_->nodes.size());
+        //  mshadow::Copy(oparam_req[i].second, net_->nodes[id].data, stream);
+        //}
+        if (net_type == kMLP) {
+          net_->Backprop(iparam_flag, iparam_need_update, iparam_epoch, iparam_t, iparam_first);
+        } else {
+          NeuralNetLSTM<xpu> *pnet = static_cast<NeuralNetLSTM<xpu>*>(net_);
+          pnet->Forward(true, iparam_batch, iparam_extra_data, iparam_need_sync, iparam_t, iparam_first);
         }
-        net_->Backprop(iparam_flag, iparam_need_update, iparam_epoch, iparam_t, iparam_first);
         stream->Wait();
         return;
       }
@@ -420,7 +432,7 @@ class NeuralNetThread {
   // trunk size
   int trunk_size;
   // net type
-  int net_type;
+  const int net_type;
   // time (RNN)
   int iparam_t;
   // first flag (RNN)

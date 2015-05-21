@@ -21,7 +21,7 @@ namespace nnet {
 template<typename xpu>
 class CXXNetThreadTrainer : public INetTrainer {
  public:
-  CXXNetThreadTrainer(void) {
+  CXXNetThreadTrainer(int net_type) : net_type(net_type) {
     batch_size = 100;
     update_period = 1;
     sample_counter = 0;
@@ -30,6 +30,7 @@ class CXXNetThreadTrainer : public INetTrainer {
     seed = 0;
     silent = 0;
     pserver = NULL;
+    trunk_size = 0;
     type_pserver = "UNSPECIFIED";
   }
   virtual ~CXXNetThreadTrainer(void) {
@@ -65,6 +66,11 @@ class CXXNetThreadTrainer : public INetTrainer {
       }
 #endif
     }
+    if (!strcmp(name,"net_type")) {
+      if (!strcmp(val, "mlp")) net_type = nnet::kMLP;
+      if (!strcmp(val, "lstm")) net_type = nnet::kLSTM;
+    }
+    if (!strcmp(name, "trunk_size")) trunk_size = atoi(val);
     if (!strcmp(name, "batch_size")) batch_size = static_cast<mshadow::index_t>(atoi(val));
     if (!strcmp(name, "update_period")) update_period = atoi(val);
     if (!strcmp(name, "eval_train")) eval_train = atoi(val);
@@ -427,7 +433,8 @@ class CXXNetThreadTrainer : public INetTrainer {
     this->InitParamServer();
     for (size_t i = 0; i < ndevice; ++i) {
       nets_.push_back(new NeuralNetThread<xpu>(net_cfg, pserver,
-                                               devices_[i], step, i + seed * 100));
+                                               devices_[i], step, i + seed * 100,
+                                               true, trunk_size, net_type));
     }
     if (silent == 0) {
       printf("finish initialization with %lu devices\n", devices_.size());
@@ -524,11 +531,13 @@ class CXXNetThreadTrainer : public INetTrainer {
   NetConfig net_cfg;
   /*! \brief history of configurations */
   std::vector< std::pair<std::string, std::string> > cfg;
+  int net_type;
+  int trunk_size;
 };
 
 template<typename xpu>
 INetTrainer *CreateNet_(int net_type) {
-  return new CXXNetThreadTrainer<xpu>();
+  return new CXXNetThreadTrainer<xpu>(net_type);
 }
 }  // namespace nnet
 }  // cxxnet

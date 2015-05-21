@@ -46,6 +46,16 @@ public:
   virtual void InitNet(bool create_layer=true) {
     Parent::nodes.resize(Parent::cfg.param.num_nodes);
     mshadow::Shape<3> s = Parent::cfg.param.input_shape;
+    // setup lstm nodes number
+    int lstm_number = 0;
+    int extra_nodes_number = 0;
+    for (int i = 0; i < Parent::cfg.param.num_layers; ++i) {
+      const NetConfig::LayerInfo &info = Parent::cfg.layers[i];
+      if (info.type == layer::kLSTM) lstm_number++;
+    }
+    extra_nodes_number = Parent::snapshots.size() > 0 ? lstm_number * 7 : lstm_number;
+    Parent::extra_nodes.resize(extra_nodes_number);
+    lstm_number = 0;
     // setup input shape
     Parent::nodes[0].data.shape_ = mshadow::Shape4(Parent::max_batch, s[0], s[1], s[2]);
     // setup extra data
@@ -68,14 +78,10 @@ public:
       if (c.type == layer::kLSTM) {
         c.nodes_in.resize(3);
         c.nodes_out.resize(7);
-        size_t nd_size = Parent::extra_nodes.size();
-        Parent::extra_nodes.resize(nd_size + 1);
-        c.nodes_out[1] = &(this->Parent::extra_nodes[nd_size]);
+        c.nodes_out[1] = &(this->Parent::extra_nodes[lstm_number++]);
         for (size_t  d = 2; d < 7; ++d) {
           if (create_layer) {
-            nd_size = Parent::extra_nodes.size();
-            Parent::extra_nodes.resize(nd_size + 1);
-            c.nodes_out[d] = &(this->Parent::extra_nodes[nd_size]);
+            c.nodes_out[d] = &(this->Parent::extra_nodes[lstm_number++]);
           } else {
             c.nodes_out[d] = NULL;
           }
