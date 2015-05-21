@@ -173,6 +173,12 @@ class CXXNetThreadTrainer : public INetTrainer {
     for (mshadow::index_t i = nets_.size(); i != 0; --i) {
       mshadow::index_t begin = std::min((i - 1) * step, data.batch_size);
       mshadow::index_t end = std::min(i * step, data.batch_size);
+      nets_[i - 1]->CopyLabel(t, info.Slice(begin, end));
+    }
+    this->WaitAllJobs();
+    for (mshadow::index_t i = nets_.size(); i != 0; --i) {
+      mshadow::index_t begin = std::min((i - 1) * step, data.batch_size);
+      mshadow::index_t end = std::min(i * step, data.batch_size);
       std::vector<mshadow::Tensor<mshadow::cpu, 4> > extra_data;
       for (mshadow::index_t j = 0; j < data.extra_data.size(); ++j){
         extra_data.push_back(data.extra_data[j].Slice(begin, end));
@@ -182,7 +188,6 @@ class CXXNetThreadTrainer : public INetTrainer {
         batch_eval_req.push_back(
           std::make_pair(eval_req[j].first, eval_req[j].second.Slice(begin, end)));
       }
-      nets_[i - 1]->CopyLabel(t, info.Slice(begin, end));
       nets_[i - 1]->Forward(data.data.Slice(begin, end),
                             extra_data, need_sync, t, is_first);
     }
@@ -195,7 +200,7 @@ class CXXNetThreadTrainer : public INetTrainer {
   }
   virtual void Backprop(int t, bool is_first) {
     for (mshadow::index_t i = nets_.size(); i != 0; --i) {
-      nets_[i]->Backprop(false, t == 0, epoch_counter, t, is_first);
+      nets_[i - 1]->Backprop(false, t == 0, epoch_counter, t, is_first);
     }
     this->WaitAllJobs();
   }

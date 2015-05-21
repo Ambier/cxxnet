@@ -162,15 +162,19 @@ struct NeuralNet {
     std::vector<layer::Connection<xpu> > &conn =  t == -1 ? connections : snapshots[t]->connections;
     for (size_t i = conn.size(); i > 0; --i) {
       layer::Connection<xpu> &c = conn[i - 1];
-      for (size_t j = 0; j < updaters[i - 1].size(); ++j) {
-        updaters[i - 1][j]->BeforeBackprop(c.nodes_in, c.nodes_out);
+      if (updaters.size() > 0) {
+        for (size_t j = 0; j < updaters[i - 1].size(); ++j) {
+          updaters[i - 1][j]->BeforeBackprop(c.nodes_in, c.nodes_out);
+        }
       }
       c.layer->Backprop(i != 1 || prop_to_input,
                         c.nodes_in, c.nodes_out, &c.state);
       // wait backprop to complete before call update
-      if (updaters[i - 1].size() != 0) stream->Wait();
-      for (size_t j = 0; j < updaters[i - 1].size(); ++j) {
-        updaters[i - 1][j]->AfterBackprop(need_update, update_epoch);
+      if (updaters.size() > 0) {
+        if (updaters[i - 1].size() != 0) stream->Wait();
+        for (size_t j = 0; j < updaters[i - 1].size(); ++j) {
+          updaters[i - 1][j]->AfterBackprop(need_update, update_epoch);
+        }
       }
     }
   }

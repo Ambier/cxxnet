@@ -268,8 +268,6 @@ class NeuralNetThread {
     }
   }
   inline void TaskDispatch(void) {
-    printf("wtf %d\n", net_type);
-    printf("%p\n", &net_type);
     CHECK(net_ != NULL);
     switch (task) {
       case kInitModel: {
