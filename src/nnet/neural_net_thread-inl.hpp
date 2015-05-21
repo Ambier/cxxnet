@@ -312,7 +312,7 @@ class NeuralNetThread {
           net_->Backprop(iparam_flag, iparam_need_update, iparam_epoch, iparam_t, iparam_first);
         } else {
           NeuralNetLSTM<xpu> *pnet = static_cast<NeuralNetLSTM<xpu>*>(net_);
-          pnet->Forward(true, iparam_batch, iparam_extra_data, iparam_need_sync, iparam_t, iparam_first);
+          pnet->Backprop(iparam_flag, iparam_need_update, iparam_epoch, iparam_t, iparam_first);
         }
         stream->Wait();
         return;
