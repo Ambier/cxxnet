@@ -90,7 +90,7 @@ public:
       if (!create_layer) {
         c.layer = NULL;
       }
-      if (c.type == layer::kSharedLayer) {
+      if (c.type == layer::kSharedLayer ) {
         CHECK(info.primary_layer_index >= 0) << "primary_layer_index problem";
         utils::Check(info.primary_layer_index < static_cast<int>(Parent::connections.size()),
                      "shared layer primary_layer_index exceed bound");
@@ -99,6 +99,9 @@ public:
                      "some layer you set shared do not allow sharing");
       } else {
         c.layer = layer::CreateLayer(c.type, &(this->Parent::rnd), &(this->Parent::label_info));
+      }
+      if (c.type == layer::kSoftmax || c.type == layer::kLpLoss) {
+        if (c.layer == NULL) c.layer = layer::CreateLayer(c.type, &(this->Parent::rnd), &(this->Parent::label_info));
       }
       Parent::connections.push_back(c);
     }
@@ -138,7 +141,7 @@ private:
     for (size_t i = 0; i < Parent::snapshots[t]->connections.size(); ++i) {
       layer::Connection<xpu> &now_c  = Parent::snapshots[t]->connections[i];
       layer::Connection<xpu> &last_c = t == 0 ? Parent::connections[i] : Parent::snapshots[t - 1]->connections[i];
-      now_c.layer = last_c.layer;
+      if (now_c.layer == NULL) now_c.layer = last_c.layer;
       if (now_c.type == layer::kLSTM) {
         now_c.nodes_in[1] = last_c.nodes_out[0];
         now_c.nodes_in[2] = last_c.nodes_out[1];
