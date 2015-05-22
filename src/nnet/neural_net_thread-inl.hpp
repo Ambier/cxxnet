@@ -118,12 +118,14 @@ class NeuralNetThread {
   /*! \brief run a train forward */
   inline void Forward(mshadow::Tensor<cpu,4> batch,
                       const std::vector<mshadow::Tensor<mshadow::cpu, 4> >& extra_data,
+                      const std::vector<std::pair<int, mshadow::Tensor<cpu, 4> > >& req,
                       bool need_sync, int t = -1, bool is_first_trunk = true) {
     iparam_batch = batch;
     iparam_extra_data = extra_data;
     iparam_need_sync = need_sync;
     iparam_t = t;
     iparam_first = is_first_trunk;
+    oparam_req = req;
     this->task = kTrainForward;
     this->ExecTask();
   }
@@ -165,9 +167,12 @@ class NeuralNetThread {
   }
   /*! \brief run a predicting forward pass, copy final layer  */
   inline void PredictForward(mshadow::Tensor<cpu, 4> batch,
-                             const std::vector<mshadow::Tensor<mshadow::cpu, 4> > &extra_data) {
+                             const std::vector<mshadow::Tensor<mshadow::cpu, 4> > &extra_data,
+                             int t = -1, bool is_first = true) {
     iparam_batch = batch;
     iparam_extra_data = extra_data;
+    iparam_t = t;
+    iparam_first = is_first;
     this->task = kPredForward;
     this->ExecTask();
   }
@@ -300,15 +305,15 @@ class NeuralNetThread {
           NeuralNetLSTM<xpu> *pnet = static_cast<NeuralNetLSTM<xpu>*>(net_);
           pnet->Forward(true, iparam_batch, iparam_extra_data, iparam_need_sync, iparam_t, iparam_first);
         }
+        for (index_t i = 0; i < oparam_req.size(); ++i) {
+          index_t id = oparam_req[i].first + (oparam_req[i].first < 0 ? net_->nodes.size() : 0);
+          CHECK(id < net_->nodes.size());
+          mshadow::Copy(oparam_req[i].second, net_->snapshots[iparam_t]->nodes[id].data, stream);
+        }
         stream->Wait();
         return;
       }
       case kTrainBackprop: {
-        //for (index_t i = 0; i < oparam_req.size(); ++i) {
-        //  index_t id = oparam_req[i].first + (oparam_req[i].first < 0 ? net_->nodes.size() : 0);
-        //  CHECK(id < net_->nodes.size());
-        //  mshadow::Copy(oparam_req[i].second, net_->nodes[id].data, stream);
-        //}
         if (net_type == kMLP) {
           net_->Backprop(iparam_flag, iparam_need_update, iparam_epoch, iparam_t, iparam_first);
         } else {
@@ -331,7 +336,12 @@ class NeuralNetThread {
         return;
       }
       case kPredForward: {
-        net_->Forward(false, iparam_batch, iparam_extra_data, true);
+        if (net_type == kMLP) {
+          net_->Forward(false, iparam_batch, iparam_extra_data, true);
+        } else if (net_type == kLSTM) {
+          NeuralNetLSTM<xpu> *pnet = static_cast<NeuralNetLSTM<xpu>*>(net_);
+          pnet->Forward(false, iparam_batch, iparam_extra_data, true, iparam_t, iparam_first);
+        }
         return;
       }
       case kCopyNode: {

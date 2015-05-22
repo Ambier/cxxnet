@@ -189,9 +189,16 @@ class CXXNetThreadTrainer : public INetTrainer {
           std::make_pair(eval_req[j].first, eval_req[j].second.Slice(begin, end)));
       }
       nets_[i - 1]->Forward(data.data.Slice(begin, end),
-                            extra_data, need_sync, t, is_first);
+                            extra_data, batch_eval_req, need_sync, t, is_first);
     }
     this->WaitAllJobs();
+    if (eval_train != 0) {
+      std::vector<mshadow::Tensor<mshadow::cpu, 2> > scores;
+      for (index_t i = 0; i < eval_req.size(); ++i) {
+        scores.push_back(eval_req[i].second.FlatTo2D());
+      }
+      train_metric.AddEval(scores, info);
+    }
     if (++sample_counter >= update_period) {
       sample_counter = 0;
       epoch_counter += 1;
