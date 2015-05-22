@@ -114,6 +114,7 @@ public:
   }
 private:
   void PrepForward(int t, bool is_first) {
+    if (t < 0) return;
     if (is_first) {
       for (size_t i = 0; i < Parent::connections.size(); ++i) {
         Parent::connections[i].nodes_out[0]->data = 0.0f;
@@ -145,6 +146,7 @@ private:
     }
   }
   void PrepBackprop(int t) {
+    if (t < 0) return;
     if (t == Parent::trunk_size - 1) {
       for (size_t i = 0; i < Parent::connections.size(); ++i) {
         if (Parent::connections[i].type == layer::kLSTM) {

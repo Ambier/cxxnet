@@ -288,7 +288,10 @@ class NeuralNetThread {
       case kUpdate: net_->Update(iparam_epoch); return;
       case kStartRound: net_->StartRound(static_cast<int>(iparam_epoch)); return;
       case kSyncParam: net_->SyncParam(); return;
-      case kCopyLabel: net_->CopyLabelInfo(iparam_t, iparam_label_info); return;
+      case kCopyLabel: {
+        net_->CopyLabelInfo(iparam_t, iparam_label_info);
+        return;
+      }
       case kTrainForward: {
         if (iparam_batch.size(0) == 0) return;
         if (net_type == kMLP) {

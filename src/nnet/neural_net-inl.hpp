@@ -138,15 +138,19 @@ struct NeuralNet {
     }
     // setup updater notification
     for (size_t i = conn.size(); i != 0; --i) {
-      for (size_t j = 0; j < updaters[i - 1].size(); ++j) {
-        updaters[i - 1][j]->BeforeAllForward();
+      if (updaters.size() > 0) {
+        for (size_t j = 0; j < updaters[i - 1].size(); ++j) {
+          updaters[i - 1][j]->BeforeAllForward();
+        }
       }
     }
     // start forward prop
     for (size_t i = 0; i < conn.size(); ++i) {
       layer::Connection<xpu> &c = conn[i];
-      for (size_t j = 0; j < updaters[i].size(); ++j) {
-        updaters[i][j]->UpdateWait();
+      if (updaters.size() > 0) {
+        for (size_t j = 0; j < updaters[i].size(); ++j) {
+          updaters[i][j]->UpdateWait();
+        }
       }
       c.layer->Forward(is_train, c.nodes_in, c.nodes_out, &c.state);
     }

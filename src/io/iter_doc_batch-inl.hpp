@@ -37,12 +37,7 @@ public:
     dshape[1] = 1;
     dshape[2] = 1;
     dshape[3] = max_dict_size;
-    lshape[0] = batch_size;
-    lshape[1] = 1;
-    out.data.shape_ = this->dshape;
-    mshadow::AllocSpace(&out.data, false);
-    out.label.shape_ = this->lshape;
-    mshadow::AllocSpace(&out.label, false);
+    out.AllocSpaceDense(dshape, batch_size, 1, false);
     loc.resize(batch_size, 0);
     this->LoadText();
   }

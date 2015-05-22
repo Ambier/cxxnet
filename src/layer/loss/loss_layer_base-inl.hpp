@@ -24,7 +24,7 @@ class LossLayerBase: public ILayer<xpu> {
     if (!strcmp(name, "batch_size")) batch_size = atoi(val);
     if (!strcmp(name, "update_period")) update_period = atoi(val);
     if (!strcmp(name, "target")) target = val;
-    if (!strcmp(name, "grad_scale")) grad_scale = atof(val);  
+    if (!strcmp(name, "grad_scale")) grad_scale = atof(val);
   }
   virtual void SetStream(mshadow::Stream<xpu> *stream) {
     this->stream_ = stream;
@@ -56,11 +56,11 @@ class LossLayerBase: public ILayer<xpu> {
     CHECK(target_index < plabelinfo->fields.size());
     this->SetGrad(nodes_in[0]->mat(),
                   plabelinfo->fields[target_index],
-                  stream_);                  
+                  stream_);
     // scale gradient by dividing global batch size
     nodes_in[0]->mat() *= (grad_scale / (batch_size * update_period));
   }
-  
+
  protected:
   // the child class can override the following functions in
   // protected fields
@@ -113,9 +113,9 @@ class LossLayerBase: public ILayer<xpu> {
   /*! \brief temp memory to do CPU side computation*/
   mshadow::TensorContainer<cpu, 2> temp_;
   /*!
-   * \brief global batch_size set by user, this 
+   * \brief global batch_size set by user, this
    *        is not necessarily the batch_size in plabelinfo,
-   *        since a batch can be divided 
+   *        since a batch can be divided
    *        into subbatch to layers in different devices
    */
   int batch_size;
