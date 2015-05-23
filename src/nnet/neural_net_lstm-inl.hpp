@@ -42,6 +42,19 @@ public:
     } else {
       Parent::Backprop(prop_to_input, need_update, update_epoch);
     }
+    if (t == 0) {
+      std::vector<layer::Connection<xpu> > &conn = Parent::snapshots[0]->connections;
+      for (size_t i = conn.size(); i > 0; --i) {
+        //layer::Connection<xpu> &c = conn[i - 1];
+        //for (size_t j = 0; j < Parent::updaters[i - 1].size(); ++j) {
+          //Parent::updaters[i - 1][j]->BeforeBackprop(c.nodes_in, c.nodes_out);
+        //}
+        Parent::stream->Wait();
+        for (size_t j = 0; j < Parent::updaters[i - 1].size(); ++j) {
+          Parent::updaters[i - 1][j]->AfterBackprop(need_update, update_epoch);
+        }
+      }
+    }
   }
   virtual void InitNet(bool create_layer=true) {
     Parent::nodes.resize(Parent::cfg.param.num_nodes);
