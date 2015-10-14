@@ -41,8 +41,8 @@ class GetWeightVisitor : public ILayer<xpu>::IVisitor {
       : mode_(0), prefix_(prefix) {
     if (!strcmp(data_type, "weight")) mode_ = 0;
     if (!strcmp(data_type, "grad")) mode_ = 1;
-    utils::Assert(mode_ == 0 || mode_ == 1,
-      "GetWeightVisitor: do not support data_type %s", data_type);
+    CHECK(mode_ == 0 || mode_ == 1)
+        << " GetWeightVisitor: do not support data_type " << data_type;
   }
   // visit
   virtual void Visit(const char *field_name,
@@ -74,7 +74,7 @@ class GetWeightVisitor : public ILayer<xpu>::IVisitor {
   // local visiting function
   template<int dim>
   inline void Visit_(const char *field_name,
-                     mshadow::Tensor<xpu, dim> weight,                     
+                     mshadow::Tensor<xpu, dim> weight,
                      mshadow::Tensor<xpu, dim> grad) {
     if (strncmp(prefix_.c_str(), field_name, prefix_.length()) != 0) return;
     fields.push_back(std::string(field_name));
@@ -113,8 +113,8 @@ class SetWeightVisitor : public ILayer<xpu>::IVisitor {
       : data_(data), prefix_(prefix), counter_(0) {
     if (!strcmp(data_type, "weight")) mode_ = 0;
     if (!strcmp(data_type, "grad")) mode_ = 1;
-    utils::Assert(mode_ == 0 || mode_ == 1,
-      "SetWeightVisitor: do not support data_type %s", data_type);
+    CHECK(mode_ == 0 || mode_ == 1)
+        << " SetWeightVisitor: do not support data_type " << data_type;
   }
   // visit
   virtual void Visit(const char *field_name,

@@ -1,6 +1,8 @@
 #include <sstream>
 #include <string>
 #include <mshadow/tensor.h>
+#include <dmlc/io.h>
+#include <dmlc/logging.h>
 #include "./cxxnet_wrapper.h"
 #include "../src/utils/config.h"
 #include "../src/nnet/nnet.h"
@@ -22,7 +24,7 @@ class WrapperIterator {
       const char *name = cfg.name();
       const char *val  = cfg.val();
       if (!strcmp(name, "iter") && !strcmp(val, "end")) {
-        utils::Assert(flag != 0, "wrong configuration file");
+        CHECK(flag != 0) << "wrong configuration file";
         iter_  = cxxnet::CreateIterator(itcfg);
         flag = 0; itcfg.clear(); continue;
       }
@@ -66,7 +68,7 @@ class WrapperIterator {
       lshape[i] = batch.label.size(i);
     }
     *p_stride = batch.label.stride_;
-    return batch.label.dptr_;    
+    return batch.label.dptr_;
   }
 
  private:
@@ -79,7 +81,7 @@ class WrapperNet {
   WrapperNet(const char *device, const char *s_cfg)
       : res_pred(false), temp2(false),
         temp4(false), net_(NULL) {
-    device = "gpu";
+    device = "cpu";
     net_type = 0;
     silent = 0;
     print_step = 100;
@@ -114,20 +116,18 @@ class WrapperNet {
   // load model from file
   inline void LoadModel(const char *fname) {
     if (net_ != NULL) delete net_;
-    FILE *fi = utils::FopenCheck(fname, "rb");
-    utils::FileStream fs(fi);
-    utils::Check(fs.Read(&net_type, sizeof(int)) != 0, "LoadModel");
+    dmlc::Stream *fs = dmlc::Stream::Create(fname, "r");
+    utils::Check(fs->Read(&net_type, sizeof(int)) != 0, "LoadModel");
     net_ = this->CreateNet();
-    net_->LoadModel(fs);
-    fclose(fi);
+    net_->LoadModel(*fs);
+    delete fs;
   }
   // save model into file
   inline void SaveModel(const char *fname) {
-    FILE *fo  = utils::FopenCheck(fname, "wb");
-    utils::FileStream fs(fo);
-    fs.Write(&net_type, sizeof(int));
-    net_->SaveModel(fs);
-    fclose(fo);
+    dmlc::Stream *fo = dmlc::Stream::Create(fname, "w");
+    fo->Write(&net_type, sizeof(int));
+    net_->SaveModel(*fo);
+    delete fo;
   }
   inline void StartRound(int round) {
     round_counter = round;
@@ -334,14 +334,14 @@ extern "C" {
     batch.batch_size = dshape[0];
     batch.data = mshadow::Tensor<cpu, 4>
         (p_data, mshadow::Shape4(dshape[0], dshape[1], dshape[2], dshape[3]));
-    return static_cast<WrapperNet*>(handle)->Extract(batch, node_name, oshape);    
+    return static_cast<WrapperNet*>(handle)->Extract(batch, node_name, oshape);
   }
   const cxx_real_t *CXNNetExtractIter(void *handle,
                                       void *data_handle,
                                       const char *node_name,
                                       cxx_uint oshape[4]) {
     return static_cast<WrapperNet*>(handle)->Extract
-        (static_cast<WrapperIterator*>(data_handle), node_name, oshape);    
+        (static_cast<WrapperIterator*>(data_handle), node_name, oshape);
   }
   const char *CXNNetEvaluate(void *handle,
                              void *data_handle,

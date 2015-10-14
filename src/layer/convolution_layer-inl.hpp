@@ -20,6 +20,7 @@ class ConvolutionLayer : public ILayer<xpu> {
   }
   virtual void ApplyVisitor(typename ILayer<xpu>::IVisitor *pvisitor) {
     pvisitor->Visit("wmat", wmat_, gwmat_);
+    pvisitor->Visit("weight", wmat_, gwmat_);
     if (param_.no_bias == 0) {
       pvisitor->Visit("bias", bias_, gbias_);
     }
@@ -97,7 +98,7 @@ class ConvolutionLayer : public ILayer<xpu> {
       out.Slice(i, i + step) =
           swapaxis<1,0>(reshape(temp_dst_,
                                 mshadow::Shape4(param_.num_channel, step, out.size(2), out.size(3))));
-      
+
     }
     if (param_.no_bias == 0) {
       // add bias, broadcast bias to dim 1: channel
@@ -197,7 +198,7 @@ class ConvolutionLayer : public ILayer<xpu> {
     // make nstep more balanced,  nstep will use exactly same number of operations to finish,
     index_t nop = (ishape[0]+nstep_-1) / nstep_;
     nstep_ = (ishape[0] + nop - 1)/ nop;
-    utils::Assert(nstep_ > 0, "InitLayer_: nstep check");
+    CHECK(nstep_ > 0);
     // helper structure
     temp_col_.Resize(mshadow::Shape2(shape_colunit_[0], shape_colunit_[1] * nstep_));
     temp_dst_.Resize(mshadow::Shape3(shape_dstunit_[0], shape_dstunit_[1], shape_dstunit_[2] * nstep_));
